@@ -51,6 +51,35 @@ public class DynamicSchemaTest {
         DynamicSchema schema = schemaBuilder.build();
         log.info("testBasic schema: {}", schema);
 
+        basicValidation(schema);
+    }
+
+    /**
+     * testParseFromProtoString - basic usage
+     */
+    @Test
+    public void testBasicWithSchemaParseFromProtoString() throws Exception {
+        log.info("--- testBasicWithSchemaParseFromProtoString ---");
+
+        // .proto definition as a string
+        String proto = """
+        syntax = "proto3";
+        package test;
+
+        message Person {
+            optional int32 id = 1;
+            optional string name = 2;
+            string email = 3;
+        }
+        """;
+
+        DynamicSchema schema = DynamicSchema.parseFromProtoString(proto, "PersonSchemaDynamic.proto");
+        log.info("testBasicWithSchemaParseFromProtoString schema: {}", schema);
+
+       basicValidation(schema);
+    }
+
+    private static void basicValidation(DynamicSchema schema) {
         // Create dynamic message from schema
         DynamicMessage.Builder msgBuilder = schema.newMessageBuilder("Person");
         Descriptor msgDesc = msgBuilder.getDescriptorForType();
@@ -131,6 +160,40 @@ public class DynamicSchemaTest {
         DynamicSchema schema = schemaBuilder.build();
         log.info("testOneof schema: {}", schema);
 
+        oneOfValidation(schema);
+    }
+
+    /**
+     * testOneofWithSchemaParseFromProtoString - oneof usage
+     */
+    @Test
+    public void testOneofWithSchemaParseFromProtoString() throws Exception {
+        log.info("--- testOneofWithSchemaParseFromProtoString ---");
+
+        // .proto definition with oneof block
+        String proto = """
+                syntax = "proto3";
+                package test;
+                
+                message Person {
+                    oneof address {
+                        string home_addr = 4;
+                        string work_addr = 5;
+                    }
+                
+                    int32 id = 1;
+                    string name = 2;
+                    string email = 3;
+                }
+                """;
+
+        // Build schema from string
+        DynamicSchema schema = DynamicSchema.parseFromProtoString(proto, "person.proto");
+        log.info("testOneofWithSchemaParseFromProtoString schema: {}", schema);
+
+    }
+
+    private static void oneOfValidation(DynamicSchema schema) {
         // Create dynamic message from schema
         DynamicMessage.Builder msgBuilder = schema.newMessageBuilder("Person");
         Descriptor msgDesc = msgBuilder.getDescriptorForType();
@@ -188,6 +251,46 @@ public class DynamicSchemaTest {
         DynamicSchema schema = schemaBuilder.build();
         log.info("testAdvanced schema: {}", schema);
 
+        testAdvanced(schema);
+    }
+
+    /**
+     * testAdvancedWithSchemaParseFromProtoString - nested messages, enums, default values, repeated fields
+     */
+    @Test
+    public void testAdvancedWithSchemaParseFromProtoString() throws Exception {
+        log.info("--- testAdvancedWithSchemaParseFromProtoString ---");
+
+        String proto = """
+        syntax = "proto3";
+        package test;
+
+        message Person {
+          enum PhoneType {
+            MOBILE = 0;
+            HOME = 1;
+            WORK = 2;
+          }
+
+          message PhoneNumber {
+            string number = 1;
+            PhoneType type = 2;
+          }
+
+          optional int32 id = 1;
+          optional string name = 2;
+          string email = 3;
+          repeated PhoneNumber phone = 4;
+        }
+        """;
+
+        DynamicSchema schema = DynamicSchema.parseFromProtoString(proto, "PersonSchemaDynamic.proto");
+        log.info("testAdvancedWithSchemaParseFromProtoString schema: {}", schema);
+
+        testAdvanced(schema);
+    }
+
+    private static void testAdvanced(DynamicSchema schema) {
         // Create dynamic message from schema
         Descriptor phoneDesc = schema.getMessageDescriptor("Person.PhoneNumber");
         DynamicMessage phoneMsg1 = schema.newMessageBuilder("Person.PhoneNumber")

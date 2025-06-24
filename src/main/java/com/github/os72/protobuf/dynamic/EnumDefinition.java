@@ -23,8 +23,13 @@ import com.google.protobuf.DescriptorProtos.EnumValueDescriptorProto;
  * EnumDefinition
  */
 public class EnumDefinition {
-    // --- public static ---
 
+    /**
+     * Creates a new {@link Builder} for constructing an enum definition.
+     *
+     * @param enumName the name of the enum type
+     * @return a new enum builder instance
+     */
     public static Builder newBuilder(String enumName) {
         return new Builder(enumName);
     }
@@ -53,8 +58,14 @@ public class EnumDefinition {
      * EnumDefinition.Builder
      */
     public static class Builder {
-        // --- public ---
 
+        /**
+         * Adds an enum value with the given name and numeric identifier.
+         *
+         * @param name the name of the enum constant
+         * @param num the numeric value of the enum constant
+         * @return this builder instance
+         */
         public Builder addValue(String name, int num) {
             EnumValueDescriptorProto.Builder enumValBuilder = EnumValueDescriptorProto.newBuilder();
             enumValBuilder.setName(name).setNumber(num);
@@ -62,6 +73,11 @@ public class EnumDefinition {
             return this;
         }
 
+        /**
+         * Builds the {@link EnumDefinition} instance from the accumulated values.
+         *
+         * @return the constructed enum definition
+         */
         public EnumDefinition build() {
             return new EnumDefinition(mEnumTypeBuilder.build());
         }

@@ -16,17 +16,7 @@
 
 package com.github.os72.protobuf.dynamic;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-
+import com.github.os72.protocjar.Protoc;
 import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
 import com.google.protobuf.Descriptors.Descriptor;
@@ -36,10 +26,43 @@ import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.DynamicMessage;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+
 /**
  * DynamicSchema
  */
 public class DynamicSchema {
+
+    private static final String PROTOC_VERSION;
+
+    static {
+        try (InputStream in = ClassLoader.getSystemResourceAsStream("protobuf.properties")) {
+            if (in == null) {
+                throw new IllegalStateException("version.properties not found");
+            }
+            Properties props = new Properties();
+            props.load(in);
+            PROTOC_VERSION = props.getProperty("protobuf.version");
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load protobuf.version", e);
+        }
+    }
+
     // --- public static ---
 
     /**
@@ -52,12 +75,57 @@ public class DynamicSchema {
     }
 
     /**
+     * Parses a schema definition from a raw .proto string using protoc-jar.
+     *
+     * @param protoSchema   the .proto schema string
+     * @param protoFileName the name to assign to the temporary .proto file
+     * @return the parsed schema object
+     * @throws DescriptorValidationException if the descriptor validation fails
+     * @throws IOException                   if an I/O error occurs
+     * @throws InterruptedException          if the protoc execution is interrupted
+     */
+    public static DynamicSchema parseFromProtoString(String protoSchema, String protoFileName)
+            throws IOException, DescriptorValidationException, InterruptedException {
+
+        Path tempDir = Files.createTempDirectory("proto-dynamic");
+        Path protoPath = tempDir.resolve(protoFileName);
+        Files.writeString(protoPath, protoSchema);
+        Path descPath = tempDir.resolve("schema.desc");
+
+        ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream errStream = new ByteArrayOutputStream();
+
+        // Suppress System.out from protoc-jar
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(OutputStream.nullOutputStream()));
+
+            int exitCode = Protoc.runProtoc(new String[]{
+                    "-v" + PROTOC_VERSION,
+                    "--descriptor_set_out=" + descPath.toAbsolutePath(),
+                    "--proto_path=" + tempDir.toAbsolutePath(),
+                    protoFileName
+            }, outStream, errStream);
+
+            if (exitCode != 0) {
+                throw new IOException(errStream.toString().trim());
+            }
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        try (InputStream in = Files.newInputStream(descPath)) {
+            return DynamicSchema.parseFrom(in);
+        }
+    }
+
+    /**
      * Parses a serialized schema descriptor (from input stream; closes the stream)
      *
      * @param schemaDescIn the descriptor input stream
      * @return the schema object
-     * @throws DescriptorValidationException
-     * @throws IOException
+     * @throws DescriptorValidationException if the descriptor validation fails
+     * @throws IOException                   if an I/O error occurs
      */
     public static DynamicSchema parseFrom(InputStream schemaDescIn) throws DescriptorValidationException, IOException {
         try {
@@ -78,8 +146,8 @@ public class DynamicSchema {
      *
      * @param schemaDescBuf the descriptor byte array
      * @return the schema object
-     * @throws DescriptorValidationException
-     * @throws IOException
+     * @throws DescriptorValidationException if the descriptor validation fails
+     * @throws IOException                   if an I/O error occurs
      */
     public static DynamicSchema parseFrom(byte[] schemaDescBuf) throws DescriptorValidationException, IOException {
         return new DynamicSchema(FileDescriptorSet.parseFrom(schemaDescBuf));
@@ -169,6 +237,16 @@ public class DynamicSchema {
     }
 
     /**
+     * Returns the list of top-level message names in the order they were declared
+     * in the original .proto schema.
+     *
+     * @return an unmodifiable list of declared message names
+     */
+    public List<String> getMessageNamesInDeclarationOrder() {
+        return Collections.unmodifiableList(declaredMessageNames);
+    }
+
+    /**
      * Returns the enum types registered with the schema
      *
      * @return the set of enum type names
@@ -231,7 +309,6 @@ public class DynamicSchema {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, FileDescriptor> init(FileDescriptorSet fileDescSet) throws DescriptorValidationException {
         // check for dupes
         Set<String> allFdProtoNames = new HashSet<String>();
@@ -287,6 +364,11 @@ public class DynamicSchema {
         mMsgDescriptorMapFull.put(msgTypeNameFull, msgType);
         mMsgDescriptorMapShort.put(msgTypeNameShort, msgType);
 
+        // Only track top-level message types (no scope)
+        if (scope == null) {
+            declaredMessageNames.add(msgType.getName());
+        }
+
         for (Descriptor nestedType : msgType.getNestedTypes()) {
             addMessageType(nestedType, msgTypeNameShort, msgDupes, enumDupes);
         }
@@ -316,6 +398,8 @@ public class DynamicSchema {
     private Map<String, EnumDescriptor> mEnumDescriptorMapFull = new HashMap<String, EnumDescriptor>();
     private Map<String, EnumDescriptor> mEnumDescriptorMapShort = new HashMap<String, EnumDescriptor>();
 
+    private final List<String> declaredMessageNames = new ArrayList<>();
+
     /**
      * DynamicSchema.Builder
      */
@@ -326,7 +410,7 @@ public class DynamicSchema {
          * Builds a dynamic schema
          *
          * @return the schema object
-         * @throws DescriptorValidationException
+         * @throws DescriptorValidationException if the descriptor validation fails
          */
         public DynamicSchema build() throws DescriptorValidationException {
             FileDescriptorSet.Builder fileDescSetBuilder = FileDescriptorSet.newBuilder();
@@ -335,37 +419,81 @@ public class DynamicSchema {
             return new DynamicSchema(fileDescSetBuilder.build());
         }
 
-        // The supported values are "proto2" and "proto3".
+        /**
+         * Sets the protobuf syntax version for the schema.
+         * Supported values are "proto2" and "proto3".
+         *
+         * @param name the syntax to use
+         * @return this builder instance
+         */
         public Builder setSyntax(String name) {
             mFileDescProtoBuilder.setSyntax(name);
             return this;
         }
 
+        /**
+         * Sets the name of the protobuf schema file.
+         *
+         * @param name the name of the schema (typically ends with .proto)
+         * @return this builder instance
+         */
         public Builder setName(String name) {
             mFileDescProtoBuilder.setName(name);
             return this;
         }
 
+        /**
+         * Sets the package name for the generated protobuf messages.
+         *
+         * @param name the package name
+         * @return this builder instance
+         */
         public Builder setPackage(String name) {
             mFileDescProtoBuilder.setPackage(name);
             return this;
         }
 
+        /**
+         * Adds a protobuf message definition to the schema.
+         *
+         * @param msgDef the message definition to add
+         * @return this builder instance
+         */
         public Builder addMessageDefinition(MessageDefinition msgDef) {
             mFileDescProtoBuilder.addMessageType(msgDef.getMessageType());
             return this;
         }
 
+        /**
+         * Adds a protobuf enum definition to the schema.
+         *
+         * @param enumDef the enum definition to add
+         * @return this builder instance
+         */
         public Builder addEnumDefinition(EnumDefinition enumDef) {
             mFileDescProtoBuilder.addEnumType(enumDef.getEnumType());
             return this;
         }
 
+        /**
+         * Adds a file dependency (import) to the schema.
+         *
+         * @param dependency the name of the dependent .proto file
+         * @return this builder instance
+         */
         public Builder addDependency(String dependency) {
             mFileDescProtoBuilder.addDependency(dependency);
             return this;
         }
 
+        /**
+         * Adds a public dependency (import) to the schema.
+         * If the dependency already exists, it is marked as public;
+         * otherwise, it is added and then marked as public.
+         *
+         * @param dependency the name of the .proto file to mark as a public import
+         * @return this builder instance
+         */
         public Builder addPublicDependency(String dependency) {
             for (int i = 0; i < mFileDescProtoBuilder.getDependencyCount(); i++) {
                 if (mFileDescProtoBuilder.getDependency(i).equals(dependency)) {
@@ -378,6 +506,13 @@ public class DynamicSchema {
             return this;
         }
 
+        /**
+         * Merges the file descriptors from another {@link DynamicSchema}
+         * into this builder. Useful for combining multiple schemas.
+         *
+         * @param schema the schema to merge
+         * @return this builder instance
+         */
         public Builder addSchema(DynamicSchema schema) {
             mFileDescSetBuilder.mergeFrom(schema.mFileDescSet);
             return this;

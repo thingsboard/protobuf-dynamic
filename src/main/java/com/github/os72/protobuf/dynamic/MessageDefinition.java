@@ -27,8 +27,13 @@ import java.util.Map;
  * MessageDefinition
  */
 public class MessageDefinition {
-    // --- public static ---
 
+    /**
+     * Creates a new {@link Builder} for constructing a protobuf message definition.
+     *
+     * @param msgTypeName the name of the message type
+     * @return a new message builder instance
+     */
     public static Builder newBuilder(String msgTypeName) {
         return new Builder(msgTypeName);
     }
@@ -57,29 +62,60 @@ public class MessageDefinition {
      * MessageDefinition.Builder
      */
     public static class Builder {
-        // --- public ---
 
+        /**
+         * Adds a field to the message.
+         *
+         * @param label the field label (e.g., "optional", "required", "repeated")
+         * @param type the field type (e.g., "string", "int32", message name)
+         * @param name the field name
+         * @param num the field number
+         * @return this builder instance
+         */
         public Builder addField(String label, String type, String name, int num) {
             FieldDescriptorProto.Label protoLabel = sLabelMap.get(label);
             addField(protoLabel, type, name, num, null);
             return this;
         }
 
+        /**
+         * Starts a new oneof group in the message.
+         *
+         * @param oneofName the name of the oneof group
+         * @return a builder for adding fields to the oneof group
+         */
         public OneofBuilder addOneof(String oneofName) {
             mMsgTypeBuilder.addOneofDecl(OneofDescriptorProto.newBuilder().setName(oneofName).build());
             return new OneofBuilder(this, mOneofIndex++);
         }
 
+        /**
+         * Adds a nested message definition.
+         *
+         * @param msgDef the nested message definition to add
+         * @return this builder instance
+         */
         public Builder addMessageDefinition(MessageDefinition msgDef) {
             mMsgTypeBuilder.addNestedType(msgDef.getMessageType());
             return this;
         }
 
+        /**
+         * Adds a nested enum definition.
+         *
+         * @param enumDef the enum definition to add
+         * @return this builder instance
+         */
         public Builder addEnumDefinition(EnumDefinition enumDef) {
             mMsgTypeBuilder.addEnumType(enumDef.getEnumType());
             return this;
         }
 
+        /**
+         * Builds the {@link MessageDefinition} from the accumulated fields and nested types.
+         *
+         * @return the constructed message definition
+         */
         public MessageDefinition build() {
             return new MessageDefinition(mMsgTypeBuilder.build());
         }
@@ -123,21 +159,46 @@ public class MessageDefinition {
      * MessageDefinition.OneofBuilder
      */
     public static class OneofBuilder {
-        // --- public ---
 
+        /**
+         * Adds a field to the oneof group.
+         *
+         * @param type the field type
+         * @param name the field name
+         * @param num the field number
+         * @return this oneof builder instance
+         */
         public OneofBuilder addField(String type, String name, int num) {
             return add(type, name, num);
         }
 
+        /**
+         * Adds a field to the oneof group. Alias for {@link #addField}.
+         *
+         * @param type the field type
+         * @param name the field name
+         * @param num the field number
+         * @return this oneof builder instance
+         */
         public OneofBuilder add(String type, String name, int num) {
             mMsgBuilder.addField(null, type, name, num, this);
             return this;
         }
 
+        /**
+         * Returns the parent {@link MessageDefinition.Builder} for chaining.
+         *
+         * @return the parent message builder
+         */
         public MessageDefinition.Builder msgDefBuilder() {
             return mMsgBuilder;
         }
 
+        /**
+         * Returns the index of the oneof group within the message.
+         *
+         * @return the oneof index
+         */
         public int getIdx() {
             return mIdx;
         }
