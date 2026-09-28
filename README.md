@@ -8,4 +8,4 @@ Published as `org.thingsboard:protobuf-dynamic`.
 
 protobuf-dynamic is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 
-The original work is Copyright the protobuf-dynamic developers. Files modified by ThingsBoard keep the upstream copyright header and carry a modification notice below it, as Apache-2.0 §4(b) requires.
+The original work is Copyright the protobuf-dynamic developers. Files modified by ThingsBoard keep the upstream copyright header.
