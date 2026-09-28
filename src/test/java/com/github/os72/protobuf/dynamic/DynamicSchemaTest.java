@@ -19,16 +19,18 @@ package com.github.os72.protobuf.dynamic;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.DynamicMessage;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 public class DynamicSchemaTest {
+    private static final Logger log = LoggerFactory.getLogger(DynamicSchemaTest.class);
+
     /**
      * testBasic - basic usage
      */
