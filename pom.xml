@@ -149,11 +149,6 @@
 		<plugin>
 		  <groupId>org.apache.maven.plugins</groupId>
 		  <artifactId>maven-javadoc-plugin</artifactId>
-		  <!--
-			Version pinned deliberately: the javadoc output directory moved between plugin
-			versions, and maven-resources-plugin below stages the license into it by path.
-			Leaving the version implicit lets the two drift apart silently.
-		  -->
 		  <version>3.12.0</version>
 		  <executions>
 			<execution>
@@ -169,11 +164,6 @@
 		  <artifactId>maven-resources-plugin</artifactId>
 		  <version>3.5.0</version>
 		  <executions>
-			<!--
-			  Runs before javadoc:jar (package), so the license is inside the javadoc jar too.
-			  The path below is maven-javadoc-plugin 3.12.0's output directory — it is pinned
-			  above precisely so this stays true.
-			-->
 			<execution>
 			  <id>copy-license-into-javadoc</id>
 			  <phase>prepare-package</phase>
@@ -197,7 +187,6 @@
 	</plugins>
 
 	<resources>
-	  <!-- Declaring any resource replaces Maven's default, so restate it. -->
 	  <resource>
 		<directory>src/main/resources</directory>
 	  </resource>
