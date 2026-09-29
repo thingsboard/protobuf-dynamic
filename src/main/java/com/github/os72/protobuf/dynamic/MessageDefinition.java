@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// SPDX-FileCopyrightText: Modifications Copyright ThingsBoard, Inc.
+// SPDX-License-Identifier: Apache-2.0
 package com.github.os72.protobuf.dynamic;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
